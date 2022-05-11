@@ -1,5 +1,6 @@
 import os
 
+import telegram
 from dotenv import load_dotenv
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import logging
@@ -16,11 +17,21 @@ def start(bot, update):
 
 
 def echo(bot, update):
+    custom_keyboard = [
+        ['Новый вопрос', 'Сдаться'],
+        ['Мой счет',]
+    ]
+    reply_markup = telegram.ReplyKeyboardMarkup(custom_keyboard)
+    bot.send_message(
+        chat_id=update.message.chat.id,
+        text="Привет, я бот для викторин",
+        reply_markup = reply_markup
+    )
     update.message.reply_text(update.message.text)
 
 
 def error(bot, update, error):
-    logger.warning('Update "%s" caused error "%s"', update, error)
+    tg_logger.warning('Update "%s" caused error "%s"', update, error)
 
 
 def get_questions_and_answers(book_directory):
