@@ -1,9 +1,16 @@
 import os
 import random
 
+import redis
 import telegram
 from dotenv import load_dotenv
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from telegram.ext import (
+    Updater,
+    CommandHandler,
+    MessageHandler,
+    Filters,
+
+)
 import logging
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -29,8 +36,14 @@ def start(bot, update):
     update.message.reply_text(f'Hi {update.message.chat.username}!')
 
 
-def echo(bot, update):
+def send_question(bot, update):
     text = "Привет, я бот для викторин"
+    redis_db = redis.Redis(
+        host='redis-15822.c300.eu-central-1-1.ec2.cloud.redislabs.com',
+        port=os.getenv('REDIS_PORT'),
+        db=0,
+        password='sC8nM6txxSrE9nZuosfQp0PpWv9n3bOD',
+    )
     keyboard = [
         ['Новый вопрос', 'Сдаться'],
         ['Мой счет', ]
@@ -53,6 +66,8 @@ def echo(bot, update):
                 resize_keyboard=True,
             )
         )
+        redis_db.set(update.message.chat.id, random_question)
+        redis_db.get(update.message.chat.id)
 
 
 def error(bot, update, error):
@@ -61,14 +76,15 @@ def error(bot, update, error):
 
 def main() -> None:
     load_dotenv()
-    updater = Updater(os.getenv("TG_TOKEN"))
+
+    updater = Updater(os.getenv('TG_TOKEN'))
 
     dp = updater.dispatcher
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("help", help))
+    dp.add_handler(CommandHandler('start', start))
+    dp.add_handler(CommandHandler('help', help))
 
-    dp.add_handler(MessageHandler(Filters.text, echo))
+    dp.add_handler(MessageHandler(Filters.text, send_question))
 
     dp.add_error_handler(error)
 
