@@ -1,37 +1,15 @@
 import os
+import random
 
 import telegram
 from dotenv import load_dotenv
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import logging
 
-
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
 tg_logger = logging.getLogger(__name__)
-
-
-def start(bot, update):
-    update.message.reply_text(f'Hi {update.message.chat.username}!')
-
-
-def echo(bot, update):
-    custom_keyboard = [
-        ['Новый вопрос', 'Сдаться'],
-        ['Мой счет',]
-    ]
-    reply_markup = telegram.ReplyKeyboardMarkup(custom_keyboard)
-    bot.send_message(
-        chat_id=update.message.chat.id,
-        text="Привет, я бот для викторин",
-        reply_markup = reply_markup
-    )
-    update.message.reply_text(update.message.text)
-
-
-def error(bot, update, error):
-    tg_logger.warning('Update "%s" caused error "%s"', update, error)
 
 
 def get_questions_and_answers(book_directory):
@@ -43,14 +21,46 @@ def get_questions_and_answers(book_directory):
         for index, item in enumerate(split_quiz):
             question_number, *question = item.split(':')
             if question_number.startswith('Вопрос'):
-                questions_and_answers[item] = split_quiz[index+1]
+                questions_and_answers[item] = split_quiz[index + 1]
         return questions_and_answers
+
+
+def start(bot, update):
+    update.message.reply_text(f'Hi {update.message.chat.username}!')
+
+
+def echo(bot, update):
+    text = "Привет, я бот для викторин"
+    keyboard = [
+        ['Новый вопрос', 'Сдаться'],
+        ['Мой счет', ]
+    ]
+    update.message.reply_text(
+        text,
+        reply_markup=telegram.ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True,
+        )
+    )
+    if update.message.text == 'Новый вопрос':
+        questions_and_answers = get_questions_and_answers(os.getenv('QUIZ_QUESTIONS_FOLDER'))
+        random_question = random.choice(list(questions_and_answers))
+        bot.send_message(
+            chat_id=update.message.chat.id,
+            text=random_question,
+            reply_markup=telegram.ReplyKeyboardMarkup(
+                keyboard,
+                resize_keyboard=True,
+            )
+        )
+
+
+def error(bot, update, error):
+    tg_logger.warning('Update "%s" caused error "%s"', update, error)
 
 
 def main() -> None:
     load_dotenv()
-    book_directory = os.getenv('QUIZ_QUESTIONS_FOLDER')
-    questions_and_answers = get_questions_and_answers(book_directory)
     updater = Updater(os.getenv("TG_TOKEN"))
 
     dp = updater.dispatcher
