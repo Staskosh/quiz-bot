@@ -1,135 +1,21 @@
 import os
 import random
 from codecs import decode
-from functools import partial
 
 import redis
-import telegram
+import vk_api as vk
 from dotenv import load_dotenv
-from telegram.ext import (
-    Updater,
-    CommandHandler,
-    MessageHandler,
-    Filters, ConversationHandler, RegexHandler,
+from vk_api.keyboard import VkKeyboard
+from vk_api.longpoll import VkLongPoll, VkEventType
 
-)
-import logging
-
-
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
-
-tg_logger = logging.getLogger(__name__)
-
-QUESTION, ANSWER, CANCEL = range(3)
-
-keyboard = [
-        ['Новый вопрос', 'Сдаться'],
-        ['Мой счет', ]
-    ]
-
-
-def get_questions_and_answers(book_directory):
-    questions_and_answers = {}
-    for file in os.listdir(book_directory):
-        with open(f'{book_directory}/{file}', 'r', encoding='KOI8-R') as my_file:
-            quiz = my_file.read()
-        split_quiz = quiz.split('\n\n')
-        for index, item in enumerate(split_quiz):
-            question_number, *question = item.split(':')
-            if question_number.startswith('Вопрос'):
-                _, split_answer = split_quiz[index + 1].split('Ответ:\n')
-                questions_and_answers[item] = split_answer
-
-        return questions_and_answers
-
-
-def start(bot, update):
-    update.message.reply_text(
-        f'Привет, {update.message.chat.username} \n Я бот для викторин!',
-        reply_markup=telegram.ReplyKeyboardMarkup(
-            keyboard,
-            resize_keyboard=True,
-        )
-    )
-
-    return QUESTION
-
-
-def handle_new_question_request(bot, update, redis_db=None, questions_and_answers=None):
-    random_question = random.choice(list(questions_and_answers))
-    bot.send_message(
-        chat_id=update.message.chat.id,
-        text=random_question,
-        reply_markup=telegram.ReplyKeyboardMarkup(
-            keyboard,
-            resize_keyboard=True,
-        )
-    )
-    redis_db.set(update.message.chat.id, questions_and_answers[random_question])
-
-    return ANSWER
-
-
-def handle_solution_attempt(bot, update, redis_db=None):
-    answer = decode(redis_db.get(update.message.chat.id))
-    without_point_answer, *_ = answer.split('.')
-    without_parenthesis_answer, *_ = answer.split('(')
-
-    if update.message.text.startswith(without_point_answer) or update.message.text.startswith(
-            without_parenthesis_answer):
-        bot.send_message(
-            chat_id=update.message.chat.id,
-            text='Правильно! Поздравляю! Для следующего вопроса нажми «Новый вопрос»',
-            reply_markup=telegram.ReplyKeyboardMarkup(
-                keyboard,
-                resize_keyboard=True,
-            )
-        )
-        update.message.text = True
-        return QUESTION
-
-    if update.message.text is not True and update.message.text != 'Сдаться':
-        bot.send_message(
-            chat_id=update.message.chat.id,
-            text='Неправильно… Попробуешь ещё раз?',
-            reply_markup=telegram.ReplyKeyboardMarkup(
-                keyboard,
-                resize_keyboard=True,
-            )
-        )
-        return ANSWER
-
-
-def give_up(bot, update, redis_db=None):
-    answer = decode(redis_db.get(update.message.chat.id))
-    bot.send_message(
-        chat_id=update.message.chat.id,
-        text=f'Правильный ответ {answer}. Для следующего вопроса нажми «Новый вопрос»',
-        reply_markup=telegram.ReplyKeyboardMarkup(
-            keyboard,
-            resize_keyboard=True,
-        )
-    )
-
-    return QUESTION
-
-
-def cancel(bot, update):
-    bot.send_message(
-        chat_id=update.message.chat.id,
-        text='Для следующего вопроса нажми «Новый вопрос»',
-        reply_markup=telegram.ReplyKeyboardMarkup(
-            keyboard,
-            resize_keyboard=True,
-        )
-    )
-
-    return QUESTION
-
-
-def error(bot, update, error):
-    tg_logger.warning(f'Update {update} caused error {error}')
+# def get_response(event, vk_api):
+#     vk_api.messages.send(
+#         user_id=event.user_id,
+#         message=event.text,
+#         keyboard=keyboard.get_keyboard(),
+#         random_id=random.randint(1,1000)
+#     )
+from get_answers_and_questions import get_questions_and_answers
 
 
 def main() -> None:
@@ -141,42 +27,72 @@ def main() -> None:
         password=os.getenv('REDIS_PASSWORD'),
     )
     questions_and_answers = get_questions_and_answers(os.getenv('QUIZ_QUESTIONS_FOLDER'))
-    updater = Updater(os.getenv('TG_TOKEN'))
+    vk_session = vk.VkApi(token=os.getenv('VK_TOKEN'))
+    vk_api = vk_session.get_api()
+    longpoll = VkLongPoll(vk_session)
 
-    dp = updater.dispatcher
+    keyboard = VkKeyboard(one_time=True)
+    keyboard.add_button('Новый вопрос')
+    keyboard.add_button('Сдаться')
 
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            QUESTION: [RegexHandler('Новый вопрос',
-                                    partial(
-                                        handle_new_question_request,
-                                        redis_db=redis_db,
-                                        questions_and_answers=questions_and_answers
-                                    )
-                                    ),
-                       ],
+    keyboard.add_line()
 
-            ANSWER: [RegexHandler('Сдаться', partial(give_up, redis_db=redis_db,)),
-                     MessageHandler(Filters.text,
-                                    partial(
-                                        handle_solution_attempt,
-                                        redis_db=redis_db,
-                                    )
-                                    ),
+    keyboard.add_button('Мой счет')
 
-                     ],
-        },
-        fallbacks=[RegexHandler('Сдаться', partial(cancel))]
-    )
-    dp.add_handler(conv_handler)
+    for event in longpoll.listen():
+        if event.type == VkEventType.MESSAGE_NEW and event.to_me:
+            vk_api.messages.send(
+                user_id=event.user_id,
+                message=f'Привет, {event.user_id} \n Я бот для викторин!',
+                keyboard=keyboard.get_keyboard(),
+                random_id=random.randint(1, 1000)
+            )
 
-    dp.add_error_handler(error)
+            if event.text == "Новый вопрос":
+                random_question = random.choice(list(questions_and_answers))
+                vk_api.messages.send(
+                    user_id=event.user_id,
+                    message=random_question,
+                    keyboard=keyboard.get_keyboard(),
+                    random_id=random.randint(1, 1000)
+                )
 
-    updater.start_polling()
+                redis_db.set(event.user_id, questions_and_answers[random_question])
 
-    updater.idle()
+                for event in longpoll.listen():
+                    if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text:
+                        answer = decode(redis_db.get(event.user_id))
+                        without_point_answer, *_ = answer.split('.')
+                        without_parenthesis_answer, *_ = answer.split('(')
+                        print(answer)
+
+                        if event.text.startswith(without_point_answer) or event.text.startswith(
+                                without_parenthesis_answer):
+                            vk_api.messages.send(
+                                user_id=event.user_id,
+                                message='Правильно! Поздравляю! Для следующего вопроса нажми «Новый вопрос»',
+                                keyboard=keyboard.get_keyboard(),
+                                random_id=random.randint(1, 1000)
+                            )
+                            break
+
+                        if event.text == "Сдаться":
+                            vk_api.messages.send(
+                                user_id=event.user_id,
+                                message=f'Правильный ответ {answer}. Для следующего вопроса нажми «Новый вопрос»',
+                                keyboard=keyboard.get_keyboard(),
+                                random_id=random.randint(1, 1000)
+                            )
+                            break
+
+                        if event.text:
+                            vk_api.messages.send(
+                                user_id=event.user_id,
+                                message='Неправильно… Попробуешь ещё раз?',
+                                keyboard=keyboard.get_keyboard(),
+                                random_id=random.randint(1, 1000)
+                            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
