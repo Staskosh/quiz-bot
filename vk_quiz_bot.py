@@ -5,10 +5,9 @@ from codecs import decode
 import redis
 import vk_api as vk
 from dotenv import load_dotenv
-from vk_api.keyboard import VkKeyboard
-from vk_api.longpoll import VkLongPoll, VkEventType
-
 from get_answers_and_questions import get_questions_and_answers
+from vk_api.keyboard import VkKeyboard
+from vk_api.longpoll import VkEventType, VkLongPoll
 
 
 def get_answer(vk_api, longpoll, redis_db, keyboard):
@@ -26,6 +25,7 @@ def get_answer(vk_api, longpoll, redis_db, keyboard):
                     keyboard=keyboard.get_keyboard(),
                     random_id=random.randint(1, 1000)
                 )
+                redis_db.flushdb()
                 break
 
             if event.text == "Сдаться":
@@ -35,6 +35,7 @@ def get_answer(vk_api, longpoll, redis_db, keyboard):
                     keyboard=keyboard.get_keyboard(),
                     random_id=random.randint(1, 1000)
                 )
+                redis_db.flushdb()
                 break
 
             if event.text:
@@ -87,6 +88,7 @@ def main() -> None:
 
     keyboard = VkKeyboard(one_time=True)
     keyboard.add_button('Новый вопрос')
+
     keyboard.add_button('Сдаться')
 
     keyboard.add_line()
@@ -94,8 +96,6 @@ def main() -> None:
     keyboard.add_button('Мой счет')
 
     get_response(vk_api, longpoll, redis_db, questions_and_answers, keyboard)
-
-
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 from codecs import decode
@@ -6,16 +7,16 @@ from functools import partial
 import redis
 import telegram
 from dotenv import load_dotenv
-from telegram.ext import (
-    Updater,
-    CommandHandler,
-    MessageHandler,
-    Filters, ConversationHandler, RegexHandler,
-
-)
-import logging
-
 from get_answers_and_questions import get_questions_and_answers
+from telegram.ext import (
+    CommandHandler,
+    ConversationHandler,
+    Filters,
+    MessageHandler,
+    RegexHandler,
+    Updater,
+)
+
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -72,7 +73,9 @@ def handle_solution_attempt(bot, update, redis_db=None):
                 resize_keyboard=True,
             )
         )
+        redis_db.flushdb()
         update.message.text = True
+
         return QUESTION
 
     if update.message.text is not True and update.message.text != 'Сдаться':
@@ -97,6 +100,7 @@ def give_up(bot, update, redis_db=None):
             resize_keyboard=True,
         )
     )
+    redis_db.flushdb()
 
     return QUESTION
 
@@ -148,9 +152,7 @@ def main() -> None:
                                     partial(
                                         handle_solution_attempt,
                                         redis_db=redis_db,
-                                    )
-                                    ),
-
+                                    )),
                      ],
         },
         fallbacks=[RegexHandler('Сдаться', partial(cancel))]
