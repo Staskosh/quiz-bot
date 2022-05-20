@@ -23,9 +23,7 @@ def handle_solution_attempt(vk_api, event, redis_db, keyboard, ):
             keyboard=keyboard.get_keyboard(),
             random_id=random.randint(1, 1000)
         )
-        event.text = True
-
-    if event.text is not True:
+    else:
         vk_api.messages.send(
             user_id=event.user_id,
             message='Неправильно… Попробуешь ещё раз?',
