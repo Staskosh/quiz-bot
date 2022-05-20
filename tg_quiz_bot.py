@@ -23,7 +23,7 @@ tg_logger = logging.getLogger(__name__)
 
 QUESTION, ANSWER, CANCEL = range(3)
 
-keyboard = [
+KEYBOARD = [
         ['Новый вопрос', 'Сдаться'],
         ['Мой счет', ]
     ]
@@ -33,7 +33,7 @@ def start(bot, update):
     update.message.reply_text(
         f'Привет, {update.message.chat.username} \n Я бот для викторин!',
         reply_markup=telegram.ReplyKeyboardMarkup(
-            keyboard,
+            KEYBOARD,
             resize_keyboard=True,
         )
     )
@@ -47,7 +47,7 @@ def handle_new_question_request(bot, update, redis_db=None, questions_and_answer
         chat_id=update.message.chat.id,
         text=random_question,
         reply_markup=telegram.ReplyKeyboardMarkup(
-            keyboard,
+            KEYBOARD,
             resize_keyboard=True,
         )
     )
@@ -67,7 +67,7 @@ def handle_solution_attempt(bot, update, redis_db=None):
             chat_id=update.message.chat.id,
             text='Правильно! Поздравляю! Для следующего вопроса нажми «Новый вопрос»',
             reply_markup=telegram.ReplyKeyboardMarkup(
-                keyboard,
+                KEYBOARD,
                 resize_keyboard=True,
             )
         )
@@ -80,7 +80,7 @@ def handle_solution_attempt(bot, update, redis_db=None):
             chat_id=update.message.chat.id,
             text='Неправильно… Попробуешь ещё раз?',
             reply_markup=telegram.ReplyKeyboardMarkup(
-                keyboard,
+                KEYBOARD,
                 resize_keyboard=True,
             )
         )
@@ -93,7 +93,7 @@ def give_up(bot, update, redis_db=None):
         chat_id=update.message.chat.id,
         text=f'Правильный ответ {answer}. Для следующего вопроса нажми «Новый вопрос»',
         reply_markup=telegram.ReplyKeyboardMarkup(
-            keyboard,
+            KEYBOARD,
             resize_keyboard=True,
         )
     )
@@ -106,7 +106,7 @@ def cancel(bot, update):
         chat_id=update.message.chat.id,
         text='Для следующего вопроса нажми «Новый вопрос»',
         reply_markup=telegram.ReplyKeyboardMarkup(
-            keyboard,
+            KEYBOARD,
             resize_keyboard=True,
         )
     )
