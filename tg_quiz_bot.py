@@ -73,7 +73,6 @@ def handle_solution_attempt(bot, update, redis_db=None):
                 resize_keyboard=True,
             )
         )
-        redis_db.flushdb()
         update.message.text = True
 
         return QUESTION
@@ -100,7 +99,6 @@ def give_up(bot, update, redis_db=None):
             resize_keyboard=True,
         )
     )
-    redis_db.flushdb()
 
     return QUESTION
 
