@@ -18,10 +18,8 @@ from telegram.ext import (
 )
 
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
-
 tg_logger = logging.getLogger(__name__)
+
 
 QUESTION, ANSWER, CANCEL = range(3)
 
@@ -116,11 +114,13 @@ def cancel(bot, update):
     return QUESTION
 
 
-def error(bot, update, error):
+def handle_error(bot, update, error):
     tg_logger.warning(f'Update {update} caused error {error}')
 
 
 def main() -> None:
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                        level=logging.INFO)
     load_dotenv()
     redis_db = redis.Redis(
         host=os.getenv('REDIS_HOST'),
@@ -157,7 +157,7 @@ def main() -> None:
     )
     dp.add_handler(conv_handler)
 
-    dp.add_error_handler(error)
+    dp.add_error_handler(handle_error)
 
     updater.start_polling()
 
